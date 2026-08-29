@@ -32,16 +32,27 @@ jobs:
       
       - name: Build
         run: npm run build
-      
+
+      # 只把真正要上線的檔案組進 _site。先前是直接上傳整個工作目錄
+      # （path: '.'），連 40MB 的 node_modules、src/、.github/ 都一起傳，
+      # 每次部署都白費一堆時間。要新增靜態資源時記得加進這一行。
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -R index.html styles.css img dist _site/
+          echo "--- _site 內容 ---"
+          du -sh _site
+          ls -R _site | head -30
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
         with:
           enablement: true
-      
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
   deploy:
     environment:

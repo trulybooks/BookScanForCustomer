@@ -42,3 +42,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Pages 發佈目錄（由 CI 組出來）
+_site/

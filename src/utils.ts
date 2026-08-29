@@ -18,87 +18,22 @@ export class UIUtils {
 	}
 
 	/**
-	 * Show loading overlay
-	 */
-	static showLoading(message: string = 'Loading...'): void {
-		const overlay = document.getElementById('loading-overlay');
-		if (!overlay) return;
-
-		const text = overlay.querySelector('p');
-		if (text) text.textContent = message;
-
-		overlay.classList.add('active');
-	}
-
-	/**
-	 * Hide loading overlay
-	 */
-	static hideLoading(): void {
-		const overlay = document.getElementById('loading-overlay');
-		if (!overlay) return;
-
-		overlay.classList.remove('active');
-	}
-
-	/**
 	 * Show a modal
 	 */
 	static showModal(modalId: string): void {
-		const modal = document.getElementById(modalId);
-		if (!modal) return;
-
-		modal.classList.add('active');
+		document.getElementById(modalId)?.classList.add('active');
 	}
 
 	/**
-	 * Hide a modal
+	 * Hide a modal and clear whatever was typed into it
 	 */
 	static hideModal(modalId: string): void {
 		const modal = document.getElementById(modalId);
 		if (!modal) return;
 
 		modal.classList.remove('active');
-
-		// Clear inputs in the modal
 		modal.querySelectorAll('input').forEach(input => {
 			input.value = '';
 		});
-	}
-
-	/**
-	 * Switch between views
-	 */
-	static switchView(viewId: string): void {
-		// Hide all views
-		document.querySelectorAll('.view').forEach(view => {
-			view.classList.remove('active');
-		});
-
-		// Show target view
-		const targetView = document.getElementById(viewId);
-		if (targetView) {
-			targetView.classList.add('active');
-		}
-	}
-
-	/**
-	 * Format date for display
-	 */
-	static formatDate(dateString: string): string {
-		const date = new Date(dateString);
-		return date.toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
-
-	/**
-	 * Escape HTML to prevent XSS
-	 */
-	static escapeHtml(text: string): string {
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
 	}
 }

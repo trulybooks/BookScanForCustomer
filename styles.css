@@ -1,463 +1,451 @@
-/* Reset and Base Styles */
+@charset "UTF-8";
+
+/* ==========================================================================
+   掃書 — 沿用「真的書店」官網設計系統
+   色票、字體、圓角、動效等規則出自 truly-bookstore/DESIGN_GUIDE.md。
+   官網用 Tailwind CDN 產生 utility class；這裡是手寫 CSS，因為這是一支只有
+   相機畫面的單頁 app，DESIGN_GUIDE 自己記錄過 Tailwind CDN 在樣式生效前造成
+   版面塌陷的坑，掃描畫面更禁不起。所有數值直接對應官網 token。
+   ========================================================================== */
+
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
 }
 
 :root {
-    --primary-color: #2563eb;
-    --primary-dark: #1d4ed8;
-    --secondary-color: #64748b;
-    --danger-color: #dc2626;
-    --success-color: #16a34a;
-    --bg-color: #f8fafc;
-    --surface-color: #ffffff;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --border-color: #e2e8f0;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
-    
-    /* Touch-friendly sizes */
-    --tap-target-min: 48px;
-    --spacing-sm: 8px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
+	/* 官網 tailwind.config 的 5 個自訂色（js/script.js） */
+	--primary: #4A403A;
+	--secondary: #6B5E55;
+	--accent: #8C7B6C;
+	--light: #F9F7F2;
+	--deco: #D4C5B0;
+
+	/* 背景色階，由淺到深（DESIGN_GUIDE 1.2） */
+	--bg-base: #F9F7F2;
+	--bg-tint: #F2EFE9;
+	--bg-surface: #FFFFFF;
+	--bg-deep: #3E3530;
+
+	/* 分隔線／卡片邊框，全站統一（DESIGN_GUIDE 1.3） */
+	--border: #E5E0D8;
+
+	--shadow-card: 0 4px 20px rgba(0, 0, 0, 0.03);
+	--shadow-card-hover: 0 10px 30px rgba(0, 0, 0, 0.08);
+	--shadow-modal: 0 25px 50px -12px rgba(74, 64, 58, 0.35);
+
+	--tap-target-min: 48px;
+	--spacing-md: 16px;
+	--spacing-lg: 24px;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: var(--bg-color);
-    color: var(--text-primary);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
+	font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	background-color: var(--bg-base);
+	color: var(--primary);
+	line-height: 1.7;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	overflow-x: hidden;
+}
+
+/* 標題一律 Noto Serif TC（DESIGN_GUIDE 3.1） */
+h1, h2, h3 {
+	font-family: 'Noto Serif TC', serif;
+	font-weight: 700;
+	color: var(--primary);
+	letter-spacing: 0.025em;
+}
+
+::selection {
+	background-color: var(--deco);
+	color: white;
+}
+
+/* JS 用來開關結果卡與「開啟相機」按鈕。寫在真實樣式表裡，第一次繪製前就生效。 */
+.hidden {
+	display: none !important;
 }
 
 #app {
-    max-width: 100%;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+	max-width: 100%;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
 }
 
-/* Header */
+/* ==========================================================================
+   Header
+   ========================================================================== */
 .app-header {
-    background: var(--primary-color);
-    color: white;
-    padding: var(--spacing-md);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: var(--shadow);
-    position: sticky;
-    top: 0;
-    z-index: 100;
+	background: var(--bg-base);
+	border-bottom: 1px solid var(--border);
+	padding: 12px var(--spacing-md);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: sticky;
+	top: 0;
+	z-index: 100;
+}
+
+.app-header .brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	text-decoration: none;
+	transition: opacity 0.3s ease;
+}
+
+.app-header .brand:hover {
+	opacity: 0.75;
+}
+
+.app-header .brand img {
+	height: 36px;
+	width: auto;
+	object-fit: contain;
+	flex-shrink: 0;
 }
 
 .app-header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
+	font-size: 1.1rem;
+	letter-spacing: 0.08em;
+	white-space: nowrap;
 }
 
-/* Buttons */
+/* Eyebrow 小標：英文全大寫 + tracking-[0.25em] + accent 色（DESIGN_GUIDE 3.2） */
+.eyebrow {
+	display: block;
+	color: var(--accent);
+	font-size: 0.7rem;
+	letter-spacing: 0.25em;
+	text-transform: uppercase;
+	margin-bottom: 6px;
+	line-height: 1.4;
+}
+
+/* ==========================================================================
+   Buttons — 一律 rounded-full（DESIGN_GUIDE 3.3）
+   ========================================================================== */
 .btn {
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: var(--tap-target-min);
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.btn:active {
-    transform: scale(0.97);
+	border: 1px solid transparent;
+	border-radius: 9999px;
+	padding: 12px 24px;
+	font-family: inherit;
+	font-size: 0.95rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	cursor: pointer;
+	text-decoration: none;
+	transition: all 0.3s ease;
+	min-height: var(--tap-target-min);
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
 }
 
 .btn-primary {
-    background: var(--primary-color);
-    color: white;
+	background: var(--primary);
+	color: #fff;
+	box-shadow: 0 10px 15px -3px rgba(74, 64, 58, 0.15);
 }
 
+.btn-primary:hover,
 .btn-primary:active {
-    background: var(--primary-dark);
+	background: var(--accent);
+	color: #fff;
 }
 
 .btn-secondary {
-    background: var(--secondary-color);
-    color: white;
+	background: var(--bg-surface);
+	color: var(--primary);
+	border-color: var(--border);
 }
 
-.btn-danger {
-    background: var(--danger-color);
-    color: white;
+.btn-secondary:hover,
+.btn-secondary:active {
+	border-color: var(--primary);
+	background: var(--bg-tint);
 }
 
 .btn-large {
-    width: 100%;
-    padding: 16px;
-    font-size: 1.1rem;
-    margin-bottom: var(--spacing-md);
+	width: 100%;
+	padding: 16px 24px;
+	font-size: 1rem;
 }
 
-.icon-btn {
-    background: transparent;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 8px;
-    min-width: var(--tap-target-min);
-    min-height: var(--tap-target-min);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    transition: background 0.2s;
-}
-
-.icon-btn:active {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-/* Views */
+/* ==========================================================================
+   Scanner — 這支 app 的唯一畫面，相機是主角
+   ========================================================================== */
 main {
-    flex: 1;
-    padding: var(--spacing-md);
-    position: relative;
+	flex: 1;
+	padding: var(--spacing-lg) var(--spacing-md);
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
 }
 
-.view {
-    display: none;
-    animation: fadeIn 0.3s;
+.scanner-intro {
+	text-align: center;
+	margin-bottom: 4px;
 }
 
-.view.active {
-    display: block;
+.scanner-intro h2 {
+	font-size: 1.4rem;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.view-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--spacing-lg);
-    gap: var(--spacing-md);
-}
-
-.view-header h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    flex: 1;
-}
-
-/* Collections Grid */
-.collections-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: var(--spacing-md);
-}
-
-.collection-card {
-    background: var(--surface-color);
-    border-radius: 12px;
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow);
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-}
-
-.collection-card:active {
-    transform: scale(0.97);
-    box-shadow: var(--shadow-lg);
-}
-
-.collection-card h3 {
-    font-size: 1.1rem;
-    margin-bottom: var(--spacing-sm);
-    word-break: break-word;
-}
-
-.collection-card p {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-/* Action Buttons */
-.action-buttons {
-    display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-}
-
-.action-buttons .btn {
-    flex: 1;
-}
-
-/* Export Buttons */
-.export-buttons {
-    margin-bottom: var(--spacing-lg);
-}
-
-.export-all-section {
-    margin-top: var(--spacing-lg);
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--border-color);
-}
-
-.btn-small {
-    padding: 10px 16px;
-    font-size: 0.95rem;
-}
-
-/* Books List */
-.books-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.book-card {
-    background: var(--surface-color);
-    border-radius: 12px;
-    padding: var(--spacing-md);
-    box-shadow: var(--shadow);
-    display: flex;
-    gap: var(--spacing-md);
-}
-
-.book-cover {
-    width: 60px;
-    height: 90px;
-    object-fit: cover;
-    border-radius: 4px;
-    background: var(--border-color);
-    flex-shrink: 0;
-}
-
-.book-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.book-info h3 {
-    font-size: 1rem;
-    margin-bottom: 4px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-.book-info p {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    margin-bottom: 2px;
-}
-
-.book-actions {
-    display: flex;
-    align-items: center;
-}
-
-.book-actions button {
-    background: transparent;
-    border: none;
-    font-size: 1.3rem;
-    cursor: pointer;
-    padding: 8px;
-    min-width: var(--tap-target-min);
-    min-height: var(--tap-target-min);
-    color: var(--danger-color);
-}
-
-/* Scanner */
 #scanner-container {
-    margin: var(--spacing-lg) 0;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
+	border-radius: 2px;
+	overflow: hidden;
+	border: 1px solid var(--border);
+	box-shadow: var(--shadow-card-hover);
+	/* 相機還沒起來前先鋪深色底，避免閃一塊白 */
+	background: var(--bg-deep);
+	min-height: 220px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 #reader {
-    border: none;
+	width: 100%;
+	border: none;
 }
 
 .scanner-status {
-    padding: var(--spacing-md);
-    background: var(--surface-color);
-    border-radius: 8px;
-    text-align: center;
-    font-size: 0.95rem;
-    color: var(--text-secondary);
+	padding: 12px var(--spacing-md);
+	background: var(--bg-tint);
+	border: 1px solid var(--border);
+	border-radius: 2px;
+	text-align: center;
+	font-size: 0.875rem;
+	letter-spacing: 0.05em;
+	color: var(--secondary);
 }
 
-/* Modals */
+/* 最後掃到的一本：官網 3.4 的「左框強調卡」 */
+.scan-result {
+	background: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-left: 4px solid rgba(212, 197, 176, 0.5);
+	border-radius: 2px;
+	padding: var(--spacing-md);
+	box-shadow: var(--shadow-card);
+	text-align: center;
+}
+
+.scan-result .eyebrow {
+	font-size: 0.6rem;
+}
+
+.scan-result-code {
+	font-family: 'Noto Serif TC', serif;
+	font-weight: 700;
+	font-size: 1.15rem;
+	letter-spacing: 0.08em;
+	margin-bottom: 12px;
+	word-break: break-all;
+}
+
+/* ==========================================================================
+   Modal — 全站同一套殼（DESIGN_GUIDE 2.8 / 3.9）：
+   bg-black/80 backdrop-blur-md 遮罩 + bg-light rounded-sm shadow-2xl 卡片 +
+   scale-95→scale-100 開合，遮罩與卡片一律 duration-300。
+   ========================================================================== */
 .modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-md);
+	display: none;
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.8);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	z-index: 1000;
+	align-items: center;
+	justify-content: center;
+	padding: var(--spacing-lg);
 }
 
 .modal.active {
-    display: flex;
-    animation: fadeIn 0.2s;
+	display: flex;
+	animation: modalFadeIn 0.3s ease forwards;
+}
+
+@keyframes modalFadeIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
 }
 
 .modal-content {
-    background: var(--surface-color);
-    border-radius: 16px;
-    padding: var(--spacing-lg);
-    max-width: 400px;
-    width: 100%;
-    box-shadow: var(--shadow-lg);
-    animation: slideUp 0.3s;
+	background: var(--light);
+	border-radius: 2px;
+	padding: 32px var(--spacing-lg);
+	max-width: 420px;
+	width: 100%;
+	box-shadow: var(--shadow-modal);
+	animation: modalScaleIn 0.3s ease forwards;
 }
 
-@keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+@keyframes modalScaleIn {
+	from { transform: scale(0.95); }
+	to { transform: scale(1); }
+}
+
+.modal-content .eyebrow {
+	text-align: center;
 }
 
 .modal-content h3 {
-    margin-bottom: var(--spacing-lg);
-    font-size: 1.3rem;
+	font-size: 1.3rem;
+	margin-bottom: var(--spacing-lg);
+	text-align: center;
 }
 
 .input-text {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    margin-bottom: var(--spacing-md);
-    transition: border-color 0.2s;
+	width: 100%;
+	padding: 13px 16px;
+	font-family: inherit;
+	font-size: 1rem;
+	color: var(--primary);
+	background: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 2px;
+	transition: all 0.3s ease;
+}
+
+.input-text::placeholder {
+	color: var(--accent);
+	opacity: 0.7;
 }
 
 .input-text:focus {
-    outline: none;
-    border-color: var(--primary-color);
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px rgba(140, 123, 108, 0.12);
 }
 
 .modal-actions {
-    display: flex;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-lg);
+	display: flex;
+	gap: 10px;
+	margin-top: var(--spacing-lg);
 }
 
 .modal-actions .btn {
-    flex: 1;
+	flex: 1;
+	padding: 12px;
+	letter-spacing: 0.05em;
 }
 
-/* Loading Overlay */
-.loading-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 2000;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    color: white;
-}
-
-.loading-overlay.active {
-    display: flex;
-}
-
-.spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.loading-overlay p {
-    margin-top: var(--spacing-md);
-    font-size: 1.1rem;
-}
-
-/* Toast Notifications */
+/* ==========================================================================
+   Toast / Footer
+   ========================================================================== */
 .toast {
-    position: fixed;
-    bottom: var(--spacing-lg);
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: var(--text-primary);
-    color: white;
-    padding: 12px 24px;
-    border-radius: 8px;
-    box-shadow: var(--shadow-lg);
-    z-index: 3000;
-    transition: transform 0.3s;
-    max-width: calc(100% - 32px);
+	position: fixed;
+	bottom: var(--spacing-lg);
+	left: 50%;
+	transform: translateX(-50%) translateY(120px);
+	background: var(--primary);
+	color: var(--light);
+	padding: 13px 26px;
+	border-radius: 9999px;
+	font-size: 0.875rem;
+	letter-spacing: 0.05em;
+	box-shadow: var(--shadow-modal);
+	z-index: 3000;
+	transition: transform 0.3s ease;
+	max-width: calc(100% - 32px);
+	text-align: center;
 }
 
 .toast.active {
-    transform: translateX(-50%) translateY(0);
+	transform: translateX(-50%) translateY(0);
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: var(--spacing-lg) var(--spacing-md);
-    color: var(--text-secondary);
+.app-footer {
+	background: var(--bg-deep);
+	color: var(--accent);
+	border-top: 1px solid rgba(255, 255, 255, 0.05);
+	padding: 24px var(--spacing-md);
+	text-align: center;
+	font-size: 0.75rem;
+	letter-spacing: 0.1em;
 }
 
-.empty-state h3 {
-    font-size: 1.2rem;
-    margin-bottom: var(--spacing-sm);
+.app-footer a {
+	color: var(--deco);
+	text-decoration: none;
+	border-bottom: 1px solid rgba(212, 197, 176, 0.3);
+	padding-bottom: 1px;
+	transition: all 0.3s ease;
 }
 
-/* Responsive adjustments */
+.app-footer a:hover {
+	color: var(--light);
+	border-color: var(--light);
+}
+
+/* ==========================================================================
+   Responsive — 只用 sm/md/lg 三個斷點（DESIGN_GUIDE 3.7）
+   桌機下內容寬度 560px，1440px 螢幕單邊留白 30%，遠高於 2.2 節的 ≥15% 下限。
+   ========================================================================== */
 @media (min-width: 768px) {
-    #app {
-        max-width: 768px;
-        margin: 0 auto;
-        box-shadow: var(--shadow-lg);
-    }
-    
-    .collections-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
+	#app {
+		max-width: 560px;
+		margin: 0 auto;
+		border-left: 1px solid var(--border);
+		border-right: 1px solid var(--border);
+	}
+
+	.app-header {
+		padding: var(--spacing-md) var(--spacing-lg);
+	}
+
+	.app-header .brand img {
+		height: 42px;
+	}
+
+	.app-header h1 {
+		font-size: 1.25rem;
+	}
+
+	main {
+		padding: 32px var(--spacing-lg);
+	}
+
+	.scanner-intro h2 {
+		font-size: 1.6rem;
+	}
 }
 
-/* Prevent text selection on interactive elements */
-.btn, .icon-btn, .collection-card, .book-card {
-    -webkit-user-select: none;
-    user-select: none;
+/* 極小螢幕微調，比照官網 css/style.css 的 375px 斷點 */
+@media (max-width: 375px) {
+	main {
+		padding: var(--spacing-md) 14px;
+	}
+
+	.app-header h1 {
+		font-size: 1rem;
+	}
+
+	.btn {
+		letter-spacing: 0.06em;
+	}
+}
+
+/* 使用者若在系統設定關閉動畫效果就不要播（無障礙，比照官網做法） */
+@media (prefers-reduced-motion: reduce) {
+	.modal.active,
+	.modal-content {
+		animation: none;
+	}
+}
+
+.btn {
+	-webkit-user-select: none;
+	user-select: none;
 }

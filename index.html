@@ -1,142 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="mobile-web-app-capable" content="yes">
-	<title>BookScan - Collection Manager</title>
+	<title>掃書｜真的書店</title>
+	<meta name="description" content="掃描書背條碼，直接開啟「真的書店」的單書頁。">
+
+	<!-- 官網同一組字體：標題 Noto Serif TC、內文 Noto Sans TC（DESIGN_GUIDE 3.1） -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+
 	<link rel="stylesheet" href="styles.css">
+	<link rel="icon" href="img/favicon_02_128.ico" type="image/png">
 </head>
 
 <body>
 	<div id="app">
 		<!-- Header -->
 		<header class="app-header">
-			<h1>📚 BookScan</h1>
-			<button id="btn-settings" class="icon-btn" aria-label="Settings">⚙️</button>
+			<a class="brand" href="https://trulybookstore.in-common.tw/" target="_blank" rel="noopener">
+				<img src="img/logo.png" alt="真的書店 Truly Bookstore">
+				<h1>掃書</h1>
+			</a>
 		</header>
 
-		<!-- Main Container -->
-		<main id="main-view">
-			<!-- Collections View (Default) -->
-			<div id="collections-view" class="view active">
-				<div class="view-header">
-					<h2>My Collections</h2>
-					<button id="btn-new-collection" class="btn btn-primary">+ New Collection</button>
-				</div>
-				<div id="collections-list" class="collections-grid">
-					<!-- Collections will be dynamically added here -->
-				</div>
-				<div class="export-all-section">
-					<button id="btn-export-all" class="btn btn-secondary btn-large">📥 Export All Collections to
-						CSV</button>
-				</div>
+		<!-- Scanner：這個 app 只有這一個畫面 -->
+		<main>
+			<div class="scanner-intro">
+				<span class="eyebrow">Scan</span>
+				<h2>掃描書背條碼</h2>
 			</div>
 
-			<!-- Collection Detail View -->
-			<div id="collection-detail-view" class="view">
-				<div class="view-header">
-					<button id="btn-back" class="btn btn-secondary">← Back</button>
-					<h2 id="collection-title">Collection Name</h2>
-					<button id="btn-collection-menu" class="icon-btn">⋮</button>
-				</div>
-
-				<div class="action-buttons">
-					<button id="btn-scan-book" class="btn btn-primary btn-large">📷 Scan Book</button>
-					<button id="btn-add-manual" class="btn btn-secondary btn-large">✏️ Add Manually</button>
-				</div>
-
-				<div class="export-buttons">
-					<button id="btn-export-collection" class="btn btn-secondary btn-small">📥 Export to CSV</button>
-				</div>
-
-				<div id="books-list" class="books-list">
-					<!-- Books will be dynamically added here -->
-				</div>
+			<div id="scanner-container">
+				<div id="reader"></div>
 			</div>
 
-			<!-- Scanner View -->
-			<div id="scanner-view" class="view">
-				<div class="view-header">
-					<button id="btn-close-scanner" class="btn btn-secondary">✕ Close</button>
-					<h2>Scan ISBN Barcode</h2>
-				</div>
-				<div id="scanner-container">
-					<div id="reader"></div>
-				</div>
-				<div id="scanner-status" class="scanner-status"></div>
+			<div id="scanner-status" class="scanner-status">正在開啟相機…</div>
+
+			<!-- 自動啟動相機失敗時才出現（iOS 有時會擋掉自動播放） -->
+			<button id="btn-start-camera" class="btn btn-primary btn-large hidden">📷 開啟相機</button>
+
+			<!-- 最後掃到的一本。新分頁被瀏覽器擋下時，這個連結是唯一的出口 -->
+			<div id="scan-result" class="scan-result hidden">
+				<span class="eyebrow">Last scanned</span>
+				<p id="scan-result-code" class="scan-result-code"></p>
+				<a id="scan-result-link" class="btn btn-primary btn-large" href="#" target="_blank"
+					rel="noopener">前往單書頁 ↗</a>
 			</div>
+
+			<button id="btn-manual" class="btn btn-secondary btn-large">✏️ 手動輸入 ISBN</button>
 		</main>
 
-		<!-- Modal for New Collection -->
-		<div id="modal-new-collection" class="modal">
+		<!-- 手動輸入 ISBN -->
+		<div id="modal-manual" class="modal">
 			<div class="modal-content">
-				<h3>New Collection</h3>
-				<input type="text" id="input-collection-name" class="input-text" placeholder="Collection name"
-					maxlength="50">
+				<span class="eyebrow">Manual Entry</span>
+				<h3>手動輸入 ISBN</h3>
+				<input type="text" id="input-isbn" class="input-text" placeholder="10 或 13 位數 ISBN"
+					maxlength="17" inputmode="numeric" autocomplete="off">
 				<div class="modal-actions">
-					<button id="btn-cancel-collection" class="btn btn-secondary">Cancel</button>
-					<button id="btn-save-collection" class="btn btn-primary">Create</button>
+					<button id="btn-cancel-manual" class="btn btn-secondary">取消</button>
+					<button id="btn-open-manual" class="btn btn-primary">開啟書頁</button>
 				</div>
 			</div>
-		</div>
-
-		<!-- Modal for Manual Book Entry -->
-		<div id="modal-add-book" class="modal">
-			<div class="modal-content">
-				<h3>Add Book Manually</h3>
-				<input type="text" id="input-isbn" class="input-text" placeholder="ISBN *" maxlength="13" required>
-				<div class="modal-actions">
-					<button id="btn-cancel-book" class="btn btn-secondary">Cancel</button>
-					<button id="btn-save-book" class="btn btn-primary">Add Book</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Modal for Collection Menu -->
-		<div id="modal-collection-menu" class="modal">
-			<div class="modal-content">
-				<h3>Collection Options</h3>
-				<button id="btn-rename-collection" class="btn btn-secondary btn-large">✏️ Rename</button>
-				<button id="btn-export-collection-menu" class="btn btn-secondary btn-large">📥 Export to
-					CSV</button>
-				<button id="btn-delete-collection" class="btn btn-danger btn-large">🗑️ Delete
-					Collection</button>
-				<button id="btn-cancel-menu" class="btn btn-secondary btn-large">Cancel</button>
-			</div>
-		</div>
-
-		<!-- Modal for Settings (Google Sheet sync) -->
-		<div id="modal-sync-settings" class="modal">
-			<div class="modal-content">
-				<h3>Settings</h3>
-				<h4>Google Sheet Sync</h4>
-				<label>
-					<input type="checkbox" id="input-sync-enabled">
-					Enable sync
-				</label>
-				<input type="text" id="input-sync-url" class="input-text"
-					placeholder="Apps Script Web App URL (…/exec)">
-				<p>Scanned ISBNs are sent in the background. This only confirms the request was
-					sent, not that it was saved — check your Sheet directly.</p>
-				<div class="modal-actions">
-					<button id="btn-test-sync" class="btn btn-secondary">Send Test</button>
-					<button id="btn-cancel-sync" class="btn btn-secondary">Cancel</button>
-					<button id="btn-save-sync" class="btn btn-primary">Save</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Loading Overlay -->
-		<div id="loading-overlay" class="loading-overlay">
-			<div class="spinner"></div>
-			<p>Loading...</p>
 		</div>
 
 		<!-- Toast Notification -->
 		<div id="toast" class="toast"></div>
+
+		<!-- Footer：比照官網的深色收尾（#3E3530，DESIGN_GUIDE 1.2 / 3.8） -->
+		<footer class="app-footer">
+			<a href="https://trulybookstore.in-common.tw/books/" target="_blank" rel="noopener">瀏覽全部書單</a>
+		</footer>
 	</div>
 
 	<!-- Scripts -->
