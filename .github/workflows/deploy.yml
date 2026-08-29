@@ -36,13 +36,18 @@ jobs:
       # 只把真正要上線的檔案組進 _site。先前是直接上傳整個工作目錄
       # （path: '.'），連 40MB 的 node_modules、src/、.github/ 都一起傳，
       # 每次部署都白費一堆時間。要新增靜態資源時記得加進這一行。
+      #
+      # ⚠️ CNAME 一定要在這份清單裡。自訂網域（scanner.in-common.tw）是由
+      # 發佈內容裡的 CNAME 檔決定的，漏掉的話每次部署都會把網域設定洗掉，
+      # 網站掉回 trulybooks.github.io。
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp -R index.html styles.css img dist _site/
+          cp -R index.html styles.css img dist CNAME _site/
           echo "--- _site 內容 ---"
           du -sh _site
           ls -R _site | head -30
+          test -f _site/CNAME || { echo "::error::CNAME 沒被複製進 _site，自訂網域會失效"; exit 1; }
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
