@@ -77,7 +77,9 @@
 		<div id="book-overlay" class="book-overlay hidden">
 			<div class="book-overlay-card">
 				<button id="btn-close-book" class="book-overlay-close" aria-label="關閉">✕</button>
-				<iframe id="book-frame" class="book-overlay-frame" title="單書頁"></iframe>
+				<!-- iframe 由 JS 動態建立／移除，不是換 src。換 src 會在瀏覽歷史裡
+				     多加一筆，返回鍵第一下就只是倒退 iframe 的導覽、關不掉 modal。 -->
+				<div id="book-frame-slot" class="book-overlay-frame-slot"></div>
 				<a id="book-overlay-external" class="book-overlay-external" href="#" target="_blank"
 					rel="noopener">在新分頁開啟 ↗</a>
 			</div>

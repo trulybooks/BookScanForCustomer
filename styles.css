@@ -408,10 +408,15 @@ main {
 	opacity: 1;
 }
 
+.book-overlay-frame-slot {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+}
+
 .book-overlay-frame {
 	flex: 1;
 	width: 100%;
-	min-height: 0;
 	border: 1px solid var(--border);
 	border-radius: 2px;
 	background: var(--bg-surface);

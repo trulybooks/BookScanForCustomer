@@ -23,6 +23,12 @@ class BookScanApp {
 	private scannerService = new ScannerService();
 	private overlayOpen = false;
 
+	/**
+	 * 目前是否還留著一筆「給返回鍵吃」的歷史條目。
+	 * 只有 popstate（＝條目真的被瀏覽器彈掉了）會把它清成 false。
+	 */
+	private pushedHistory = false;
+
 	constructor() {
 		this.setupEventListeners();
 
@@ -74,7 +80,12 @@ class BookScanApp {
 		});
 
 		document.getElementById('btn-close-book')?.addEventListener('click', () => {
-			this.requestCloseOverlay();
+			this.closeOverlay();
+		});
+
+		// 點遮罩也能關，跟官網其他 modal 一致（點卡片本身不會關）
+		document.getElementById('book-overlay')?.addEventListener('click', (e) => {
+			if (e.target === e.currentTarget) this.closeOverlay();
 		});
 
 		// 「上次掃描」的連結也走疊層。放任它同頁導向的話，就又把先前那些
@@ -85,8 +96,10 @@ class BookScanApp {
 			if (code) this.openBookPage(code);
 		});
 
-		// 手機的實體／手勢返回鍵：關閉疊層，而不是離開整個 app
+		// 手機的實體／手勢返回鍵：關閉疊層，而不是離開整個 app。
+		// 這時候那筆歷史條目已經被瀏覽器彈掉了，closeOverlay 不可以再 back 一次。
 		window.addEventListener('popstate', () => {
+			this.pushedHistory = false;
 			this.closeOverlay();
 		});
 
@@ -165,12 +178,11 @@ class BookScanApp {
 		this.setLastOpenedCode(code);
 		this.showResult(code);
 
-		const frame = document.getElementById('book-frame') as HTMLIFrameElement | null;
 		const external = document.getElementById('book-overlay-external') as HTMLAnchorElement | null;
 		const overlay = document.getElementById('book-overlay');
-		if (!frame || !overlay) return;
+		if (!overlay) return;
 
-		frame.src = url;
+		this.mountFrame(url);
 		if (external) external.href = url;
 		overlay.classList.remove('hidden');
 		this.overlayOpen = true;
@@ -178,30 +190,66 @@ class BookScanApp {
 		// 疊層後面不要繼續解碼，但相機留著——關掉疊層要能立刻接著掃
 		this.scannerService.pauseScanning();
 
-		// 推一筆歷史條目，讓手機的上一頁變成「關閉疊層」而不是離開整個 app
-		try {
-			history.pushState({ bookOverlay: true }, '', location.href);
-		} catch {
-			/* 推不了就只剩 ✕ 可以關，不影響主要流程 */
+		// 推一筆歷史條目，讓手機的上一頁變成「關閉疊層」而不是離開整個 app。
+		// 用 ✕ 或遮罩關掉時不會回收這筆條目（回收會弄壞返回鍵，見 closeOverlay），
+		// 所以這裡先確認還沒有一筆在手上，避免每開一本就疊一筆、要按很多次才離得開。
+		if (!this.pushedHistory) {
+			try {
+				history.pushState({ bookOverlay: true }, '', location.href);
+				this.pushedHistory = true;
+			} catch {
+				/* 推不了就只剩 ✕ 與遮罩可以關，不影響主要流程 */
+				this.pushedHistory = false;
+			}
 		}
 	}
 
-	/** 關閉疊層並恢復掃描。統一走上一頁，讓 ✕ 與實體返回鍵收斂到同一條路徑。 */
-	private requestCloseOverlay(): void {
-		if (!this.overlayOpen) return;
-		history.back();
-	}
-
+	/**
+	 * 關閉疊層並恢復掃描。可以重複呼叫。
+	 *
+	 * ✕ 會直接呼叫這裡把畫面關掉，不透過 history.back()。先前是走 history 讓 ✕ 與
+	 * 返回鍵共用一條路徑，但在實機上 popstate 沒有如期送達，結果只有 iframe 被清空、
+	 * 卡片還留在畫面上。關閉是使用者每掃一本都要做的動作，不能仰賴某個事件一定會來。
+	 */
 	private closeOverlay(): void {
 		if (!this.overlayOpen) return;
 		this.overlayOpen = false;
 
-		const frame = document.getElementById('book-frame') as HTMLIFrameElement | null;
 		document.getElementById('book-overlay')?.classList.add('hidden');
-		// 清掉 src 讓書頁停止運作並釋放記憶體，否則疊層開開關關會越積越多
-		if (frame) frame.src = 'about:blank';
+		this.unmountFrame();
 
 		this.scannerService.resumeScanning();
+
+		// 刻意不在這裡呼叫 history.back() 去回收那筆條目。試過，結果是緊接著的
+		// pushState 與那個非同步的 back 互相打架，返回鍵就再也關不掉疊層了。
+		// 條目留著沒關係——下面的 openBookPage 不會重複推，所以最多只會有一筆。
+	}
+
+	/**
+	 * 每次都建立一個全新的 iframe，關閉時整個移除。
+	 *
+	 * 不用「換 src」的原因：iframe 的每一次導覽都會在瀏覽歷史裡多加一筆，開啟一筆、
+	 * 關閉設回 about:blank 又一筆。返回鍵於是變成先倒退 iframe 的導覽，按了不會關掉
+	 * 疊層。把元素整個移除，它的歷史紀錄會跟著消失；而新建 iframe 的第一次載入
+	 * 不會產生條目，所以歷史裡永遠只有我們自己推的那一筆。
+	 * 移除同時也讓書頁停止運作、釋放記憶體。
+	 */
+	private mountFrame(url: string): void {
+		const slot = document.getElementById('book-frame-slot');
+		if (!slot) return;
+
+		slot.replaceChildren();
+
+		const frame = document.createElement('iframe');
+		frame.id = 'book-frame';
+		frame.className = 'book-overlay-frame';
+		frame.title = '單書頁';
+		frame.src = url;
+		slot.appendChild(frame);
+	}
+
+	private unmountFrame(): void {
+		document.getElementById('book-frame-slot')?.replaceChildren();
 	}
 
 	/** 顯示上一本掃到的書，方便確認剛才掃到什麼、或不用再掃一次就重開。 */

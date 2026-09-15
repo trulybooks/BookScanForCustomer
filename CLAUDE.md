@@ -92,10 +92,21 @@ contain frame-busting code (re-check if that ever changes).
 
 How it holds together:
 
-- Opening pushes a history entry, so the phone's back gesture **closes the overlay** instead of
-  leaving the app. The ✕ button calls `history.back()` too, so both routes run one code path.
-- Closing resets `src` to `about:blank`. Without it, repeatedly opening books piles up live
-  embedded pages.
+- **✕ closes the overlay directly.** It used to call `history.back()` and let the popstate
+  handler do the closing, so both routes shared a path — but the popstate didn't arrive on a
+  real phone and only the iframe got cleared, leaving the card on screen. Closing happens once
+  per book; it can't depend on an event turning up.
+- Opening pushes a history entry so the phone's back gesture **closes the overlay** instead of
+  leaving the app. Closing does *not* reclaim that entry — trying to (a `history.back()` in
+  the close path) raced with the next `pushState` and broke the back gesture entirely. Instead
+  `pushedHistory` makes sure at most one entry is outstanding, so they never pile up. Only
+  popstate clears the flag, because only then has the browser actually consumed the entry.
+- **The iframe is created and removed, never re-`src`-ed.** Every iframe navigation adds a
+  joint-session-history entry — one to open, another to reset to `about:blank` — so back walked
+  those instead of closing the overlay. Removing the element drops its history with it, and a
+  fresh iframe's first load adds nothing, which keeps the only entry the one we pushed
+  ourselves. It also stops the embedded page and frees its memory.
+- Tapping the scrim closes too, matching the site's other modals; clicks inside the card don't.
 - The overlay pauses decoding but **keeps the camera stream** (`pauseScanning` /
   `resumeScanning`). Stopping the camera outright would mean renegotiating `getUserMedia` on
   every close — half a second of dead time before the next book can be scanned.
@@ -136,8 +147,11 @@ locally. What works, and is worth redoing after changes:
   results — barcode in every frame must never fire, blank-then-barcode must fire exactly once.
 - Stub `getUserMedia` with `canvas.captureStream()` and a delay, then fire the return events
   during that window and count cameras opened — it must stay at one.
-- Drive the overlay through manual entry and assert it opens, closes via both ✕ and `history.
-  back()`, clears `src`, and never changes `location`.
+- Drive the overlay through manual entry and assert all four behaviours: ✕ closes it
+  synchronously, the back gesture closes it, the scrim closes it, a click inside the card does
+  not — and that `location` never changes and the history depth stays at +1 across repeated
+  open/close cycles. Point the iframe at a local page while testing; four real remote loads
+  hang headless Chrome.
 
 ## Key design decision: the UI follows the truly-bookstore website
 
