@@ -44,12 +44,12 @@
 			<!-- 自動啟動相機失敗時才出現（iOS 有時會擋掉自動播放） -->
 			<button id="btn-start-camera" class="btn btn-primary btn-large hidden">📷 開啟相機</button>
 
-			<!-- 最後掃到的一本。新分頁被瀏覽器擋下時，這個連結是唯一的出口 -->
+			<!-- 上一本掃到的書。回到本頁後同一本不會再自動導向（避免一按上一頁
+			     就被彈回書頁的迴圈），所以這裡是重新打開它的唯一入口 -->
 			<div id="scan-result" class="scan-result hidden">
 				<span class="eyebrow">Last scanned</span>
 				<p id="scan-result-code" class="scan-result-code"></p>
-				<a id="scan-result-link" class="btn btn-primary btn-large" href="#" target="_blank"
-					rel="noopener">前往單書頁 ↗</a>
+				<a id="scan-result-link" class="btn btn-primary btn-large" href="#">再次開啟書頁</a>
 			</div>
 
 			<button id="btn-manual" class="btn btn-secondary btn-large">✏️ 手動輸入 ISBN</button>

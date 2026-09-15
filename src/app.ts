@@ -9,18 +9,47 @@ import { UIUtils } from './utils.js';
  */
 const BOOK_PAGE_BASE = 'https://trulybookstore.in-common.tw/books/book-';
 
+/**
+ * 記住最後一次開啟的條碼，掃到同一本時直接略過。
+ *
+ * 這在同頁導向下是必要的，不是最佳化：從單書頁按上一頁回來時相機會重新啟動，
+ * 如果鏡頭還對著同一本書，立刻又會解碼成功、又把整頁導走——使用者會被困在
+ * 「一按上一頁就被彈回書頁」的迴圈裡，連換下一本的機會都沒有。
+ *
+ * 存在 sessionStorage 而不是只放記憶體：回上一頁不一定走 bfcache（頁面用過
+ * getUserMedia 時常常不符合 bfcache 條件），整頁重新載入的話記憶體裡的值就沒了，
+ * 迴圈照樣成立。sessionStorage 只活在這個分頁、關掉就消失，不是在存使用者資料。
+ */
+const LAST_CODE_KEY = 'bookScan_lastOpenedCode';
+
 class BookScanApp {
 	private scannerService = new ScannerService();
 
-	/**
-	 * 最後一次開啟的條碼。相機在回到本頁時會重新啟動，若鏡頭還對著同一本書會
-	 * 立刻再解碼一次、又開一個分頁。記住上一本並略過相同的條碼，換一本才會再觸發。
-	 */
-	private lastOpenedCode: string | null = null;
-
 	constructor() {
 		this.setupEventListeners();
+
+		// 回到本頁時把上一本顯示出來，才有辦法再打開它（同一本不會再自動導向）
+		const previous = this.getLastOpenedCode();
+		if (previous) this.showResult(previous);
+
 		this.startScanning();
+	}
+
+	private getLastOpenedCode(): string | null {
+		try {
+			return sessionStorage.getItem(LAST_CODE_KEY);
+		} catch {
+			// Safari 無痕模式等情況會直接丟例外，當作沒有記錄即可
+			return null;
+		}
+	}
+
+	private setLastOpenedCode(code: string): void {
+		try {
+			sessionStorage.setItem(LAST_CODE_KEY, code);
+		} catch {
+			/* 存不了就算了，頂多同一本會再導向一次，不影響主要流程 */
+		}
 	}
 
 	private setupEventListeners(): void {
@@ -85,8 +114,7 @@ class BookScanApp {
 	private handleScannedCode(code: string): void {
 		const cleaned = code.replace(/[-\s]/g, '');
 
-		if (cleaned === this.lastOpenedCode) return;
-		this.lastOpenedCode = cleaned;
+		if (cleaned === this.getLastOpenedCode()) return;
 
 		this.openBookPage(cleaned);
 	}
@@ -101,34 +129,32 @@ class BookScanApp {
 		}
 
 		UIUtils.hideModal('modal-manual');
-		this.lastOpenedCode = cleaned;
 		this.openBookPage(cleaned);
 	}
 
 	/**
-	 * 在新分頁開啟單書頁，掃描器留在原地。
+	 * 在同一個分頁導向單書頁。
 	 *
-	 * 條碼解碼的 callback 不算使用者手勢，瀏覽器（iOS Safari 尤其）會擋掉
-	 * window.open。擋掉時退回顯示一張帶連結的卡片——點它就是手勢，一定開得起來。
-	 * 注意不能用 window.open(url, '_blank', 'noopener')：帶 noopener 時瀏覽器
-	 * 一律回傳 null，就無法分辨「被擋」還是「開成功」了。改成開完手動切斷 opener。
+	 * 刻意用 location.assign 而不是 window.open：條碼解碼的 callback 不算使用者
+	 * 手勢，瀏覽器（iOS Safari 尤其）會把 window.open 當成彈出視窗擋掉，使用者會
+	 * 看到一則攔截警告、還得多點一次才進得去。同頁導向不受彈出視窗封鎖限制，
+	 * 一定成功、也就沒有警告可言。代價是要按上一頁才能掃下一本。
 	 */
 	private openBookPage(code: string): void {
-		const url = `${BOOK_PAGE_BASE}${code}/`;
-		this.showResult(code, url);
+		this.setLastOpenedCode(code);
+		this.showResult(code);
 
-		const opened = window.open(url, '_blank');
+		// 先關相機再離開，讓鏡頭與錄影指示燈乾淨地釋放，不要留給瀏覽器收尾
+		this.scannerService.stopScanner();
 
-		if (opened) {
-			opened.opener = null;
-			UIUtils.showToast(`已開啟 ${code}`, 2000);
-		} else {
-			UIUtils.showToast('瀏覽器擋下了新分頁，請點下方連結', 4000);
-		}
+		location.assign(`${BOOK_PAGE_BASE}${code}/`);
 	}
 
-	/** 顯示最後掃到的一本，讓被擋下時（或想再看一次時）有地方可以點。 */
-	private showResult(code: string, url: string): void {
+	/**
+	 * 顯示上一本掃到的書。回到本頁後同一本不會再自動導向（見 LAST_CODE_KEY），
+	 * 這張卡片就是重新打開它的唯一入口。
+	 */
+	private showResult(code: string): void {
 		const result = document.getElementById('scan-result');
 		const link = document.getElementById('scan-result-link') as HTMLAnchorElement | null;
 		const codeEl = document.getElementById('scan-result-code');
@@ -136,7 +162,7 @@ class BookScanApp {
 		if (!result || !link || !codeEl) return;
 
 		codeEl.textContent = code;
-		link.href = url;
+		link.href = `${BOOK_PAGE_BASE}${code}/`;
 		result.classList.remove('hidden');
 	}
 
