@@ -144,6 +144,22 @@ class BookScanApp {
 		// 先關相機再離開，讓鏡頭與錄影指示燈乾淨地釋放，不要留給瀏覽器收尾
 		this.scannerService.stopScanner();
 
+		// 離開前先替掃描器多推一筆歷史條目。
+		//
+		// WebKit（iOS Safari）會把「載入後沒有使用者操作就自動導走」當成 client
+		// redirect，用 replace 取代當前的歷史條目而不是往後推一筆——掃描器那一筆
+		// 就這樣被書頁吃掉，使用者按上一頁會直接跳到更前面的頁面，回不到掃描器。
+		// 條碼是相機自己解出來的，永遠不算使用者手勢，所以一定會踩到這個啟發式。
+		//
+		// 多推一筆之後兩種語意都安全：被 replace 就吃掉這筆多的、原本那筆還在；
+		// 正常 push 則是多一筆相同網址的掃描器頁。不論哪種，按一次上一頁都會回到
+		// 掃描器。桌機 Chrome 實測一律是 push，加了這行也不會變差。
+		try {
+			history.pushState(null, '', location.href);
+		} catch {
+			/* pushState 失敗不該擋住導向，最差就是回到修正前的行為 */
+		}
+
 		location.assign(`${BOOK_PAGE_BASE}${code}/`);
 	}
 
