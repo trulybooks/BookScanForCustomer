@@ -70,47 +70,74 @@ Two things follow from this, and both have bitten:
   this repo's deploys and the website's monthly regeneration cron, for a check the 404 page
   already handles.
 
-## Opening the book page: same tab, and the `armed` gate that makes back work
+## Opening the book page: an overlay, because navigating away kept breaking
 
-`openBookPage` uses `location.assign` — a **same-tab** navigation. It was `window.open` with a
-new tab, which does not survive contact with a phone: the scan callback fires from an async
-decode loop, which browsers don't treat as a user gesture, so iOS Safari showed a blocked-popup
-warning and the reader had to tap a fallback card to get through. Same-tab navigation is never
-popup-blocked, so the warning cannot occur. Don't reintroduce `window.open` here.
+The book page is shown **in an iframe overlay on the scanner page**. Nothing navigates. Two
+earlier designs were tried on real phones and both failed, so don't "simplify" back to either:
 
-The cost is that reading the next book means pressing back, which creates the failure this
-section is really about. On back the scanner reloads and the camera restarts; **if it is still
-pointed at the book, it decodes again instantly and navigates away again** — the reader presses
-back, gets bounced straight to the book page, and concludes the back button is broken.
+- **`window.open` in a new tab.** The scan callback comes from an async decode loop, which
+  browsers don't count as a user gesture, so iOS Safari blocked it as a popup and showed a
+  warning; the reader had to tap a fallback link to get through.
+- **`location.assign` in the same tab.** No popup warning, but WebKit treats a gesture-less
+  navigation shortly after load as a *client redirect* and **replaces** the current history
+  entry instead of pushing one. The scanner's entry got eaten, so back skipped past it to
+  whatever preceded the app. A camera-decoded barcode is never a gesture, so this path always
+  qualifies. A defensive `history.pushState` before navigating was tried; the overlay replaced
+  it before it could be judged on a phone.
 
-`ScannerService.armed` is the fix: after the scanner starts, it reports nothing until it has
-seen **one frame with no barcode in it**. That means the camera has to actually leave the book
-before the next navigation, so returning always lands you on a stable scanner.
+The overlay has neither failure mode, and it's faster: the camera never stops, so closing puts
+you straight back to scanning. Framing is safe to rely on — the site sends no
+`X-Frame-Options` and no CSP `frame-ancestors`, and neither the book pages nor `js/script.js`
+contain frame-busting code (re-check if that ever changes).
 
-This was originally solved in `app.ts` by remembering the last barcode and ignoring re-scans of
-the same code. **Don't go back to that** — it fails twice over:
+How it holds together:
 
-- Many books carry a second barcode next to the ISBN (a `471…` internal/price code is common
-  here). The wide scan region picks up whichever, so the two codes alternate and a
-  remembered-code check never matches. The reader gets bounced anyway.
-- It made a book impossible to rescan on purpose. The `armed` gate doesn't look at the code at
-  all, so scanning the same book again works — just move the camera away and back.
+- Opening pushes a history entry, so the phone's back gesture **closes the overlay** instead of
+  leaving the app. The ✕ button calls `history.back()` too, so both routes run one code path.
+- Closing resets `src` to `about:blank`. Without it, repeatedly opening books piles up live
+  embedded pages.
+- The overlay pauses decoding but **keeps the camera stream** (`pauseScanning` /
+  `resumeScanning`). Stopping the camera outright would mean renegotiating `getUserMedia` on
+  every close — half a second of dead time before the next book can be scanned.
+- The "last scanned" link goes through the overlay as well. Letting it navigate would drag the
+  history problem back in through a side door.
 
-Other behaviors that exist for a reason:
+### `ScannerService.armed`
 
-- The camera stops on `visibilitychange` (leaving it on drains battery and keeps the recording
-  indicator lit) and restarts on return.
-- `pageshow` with `persisted` restarts the scanner, because a bfcache-restored `<video>` has a
-  dead stream. A page that has used `getUserMedia` often isn't bfcache-eligible, so the plain
-  reload path in the constructor matters just as much.
-- The last code is kept in `sessionStorage` purely to render the "last scanned" card after a
-  return. It is **not** a duplicate-scan guard; see above.
+The scanner reports nothing until it has seen **one frame containing no barcode**. Otherwise,
+resuming with the camera still pointed at the book you just scanned reopens it immediately.
 
-Headless Chrome cannot verify any of this: the camera and wasm pipeline never advance far
-enough under the virtual clock to produce a decode. What is testable, and worth redoing after
-changes here, is replaying Y4M frames through the real decoder in Node and running the `armed`
-state machine over the results — barcode-in-every-frame must never fire, blank-then-barcode
-must fire exactly once.
+Don't replace this with "remember the last barcode and skip re-scans of the same code", which
+is what it used to be. It failed twice over: many books here carry a second barcode beside the
+ISBN (`471…` internal codes), and the wide scan region catches whichever, so the codes alternate
+and the check never matches; and it made rescanning a book on purpose impossible. `armed`
+ignores the code entirely — move the camera away and back and anything scans again.
+
+### Concurrent starts will break `armed` if you let them
+
+`isScanning` only becomes true after awaiting `getUserMedia` and `video.play()`, so two callers
+arriving during those awaits both saw it false and both started a camera. That leaked streams,
+and — the part that actually bit — ran **two scan loops sharing one `armed` flag**, where one
+sets it on a clear frame and the other consumes it on the next, so the gate silently stopped
+holding. `pageshow` and `visibilitychange` both fire on return, which is exactly that case.
+
+`isStarting` (set synchronously) blocks re-entry, and `startGeneration` retires superseded scan
+loops and discards a stream acquired after a stop. Starting while already running returns
+quietly rather than throwing — the old throw surfaced as a camera error with a "start camera"
+button on a scanner that was working fine.
+
+### What can and cannot be tested here
+
+Headless Chrome never advances far enough under its virtual clock to decode a barcode, load the
+wasm, or fire the overlay iframe's `load` event, so end-to-end scanning can't be verified
+locally. What works, and is worth redoing after changes:
+
+- Replay Y4M frames through the real decoder in Node and run the `armed` state machine over the
+  results — barcode in every frame must never fire, blank-then-barcode must fire exactly once.
+- Stub `getUserMedia` with `canvas.captureStream()` and a delay, then fire the return events
+  during that window and count cameras opened — it must stay at one.
+- Drive the overlay through manual entry and assert it opens, closes via both ✕ and `history.
+  back()`, clears `src`, and never changes `location`.
 
 ## Key design decision: the UI follows the truly-bookstore website
 

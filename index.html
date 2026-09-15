@@ -71,6 +71,18 @@
 		<!-- Toast Notification -->
 		<div id="toast" class="toast"></div>
 
+		<!-- 書籍疊層：在原地用 iframe 顯示單書頁，完全不發生頁面導向。
+		     這樣就沒有彈出視窗攔截、沒有歷史條目被 client redirect 吃掉的問題，
+		     相機也不用關，關掉疊層可以立刻掃下一本。 -->
+		<div id="book-overlay" class="book-overlay hidden">
+			<div class="book-overlay-bar">
+				<button id="btn-close-book" class="book-overlay-close">✕ 關閉</button>
+				<a id="book-overlay-external" class="book-overlay-external" href="#" target="_blank"
+					rel="noopener">在新分頁開啟 ↗</a>
+			</div>
+			<iframe id="book-frame" class="book-overlay-frame" title="單書頁"></iframe>
+		</div>
+
 		<!-- Footer：比照官網的深色收尾（#3E3530，DESIGN_GUIDE 1.2 / 3.8） -->
 		<footer class="app-footer">
 			<a href="https://trulybookstore.in-common.tw/books/" target="_blank" rel="noopener">瀏覽全部書單</a>

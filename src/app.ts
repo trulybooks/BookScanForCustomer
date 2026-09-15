@@ -21,6 +21,7 @@ const LAST_CODE_KEY = 'bookScan_lastOpenedCode';
 
 class BookScanApp {
 	private scannerService = new ScannerService();
+	private overlayOpen = false;
 
 	constructor() {
 		this.setupEventListeners();
@@ -72,8 +73,25 @@ class BookScanApp {
 			if ((e as KeyboardEvent).key === 'Enter') this.handleManualSubmit();
 		});
 
-		// 從單書頁按上一頁回來時，bfcache 還原的 video 元素已經沒有串流了，
-		// 得重新啟動相機。persisted 為 false 的一般載入由 constructor 負責。
+		document.getElementById('btn-close-book')?.addEventListener('click', () => {
+			this.requestCloseOverlay();
+		});
+
+		// 「上次掃描」的連結也走疊層。放任它同頁導向的話，就又把先前那些
+		// 歷史條目與彈出視窗的問題帶回來了。
+		document.getElementById('scan-result-link')?.addEventListener('click', (e) => {
+			e.preventDefault();
+			const code = document.getElementById('scan-result-code')?.textContent?.trim();
+			if (code) this.openBookPage(code);
+		});
+
+		// 手機的實體／手勢返回鍵：關閉疊層，而不是離開整個 app
+		window.addEventListener('popstate', () => {
+			this.closeOverlay();
+		});
+
+		// bfcache 還原的 video 元素已經沒有串流了，得重新啟動相機。
+		// persisted 為 false 的一般載入由 constructor 負責。
 		window.addEventListener('pageshow', (e) => {
 			if ((e as PageTransitionEvent).persisted) this.startScanning();
 		});
@@ -85,6 +103,8 @@ class BookScanApp {
 				this.scannerService.stopScanner();
 			} else {
 				this.startScanning();
+				// 疊層還開著就讓它維持暫停，不要在書頁後面偷偷繼續解碼
+				if (this.overlayOpen) this.scannerService.pauseScanning();
 			}
 		});
 	}
@@ -130,37 +150,58 @@ class BookScanApp {
 	}
 
 	/**
-	 * 在同一個分頁導向單書頁。
+	 * 在原地用 iframe 疊層顯示單書頁，完全不離開這一頁。
 	 *
-	 * 刻意用 location.assign 而不是 window.open：條碼解碼的 callback 不算使用者
-	 * 手勢，瀏覽器（iOS Safari 尤其）會把 window.open 當成彈出視窗擋掉，使用者會
-	 * 看到一則攔截警告、還得多點一次才進得去。同頁導向不受彈出視窗封鎖限制，
-	 * 一定成功、也就沒有警告可言。代價是要按上一頁才能掃下一本。
+	 * 先前試過另開分頁和同頁導向，兩條路都被瀏覽器的行為擋掉：解碼 callback 不算
+	 * 使用者手勢，window.open 會被當成彈出視窗攔截；改成 location.assign 之後，
+	 * WebKit 又把「載入後沒有手勢就自動導走」當成 client redirect，用 replace 吃掉
+	 * 掃描器的歷史條目，按上一頁會跳到更前面的頁面。疊層沒有導向，這兩類問題都不存在，
+	 * 而且相機不用關，關掉疊層可以馬上掃下一本。官網的單書頁沒有 X-Frame-Options
+	 * 也沒有 CSP frame-ancestors，所以可以嵌入。
 	 */
 	private openBookPage(code: string): void {
+		const url = `${BOOK_PAGE_BASE}${code}/`;
+
 		this.setLastOpenedCode(code);
 		this.showResult(code);
 
-		// 先關相機再離開，讓鏡頭與錄影指示燈乾淨地釋放，不要留給瀏覽器收尾
-		this.scannerService.stopScanner();
+		const frame = document.getElementById('book-frame') as HTMLIFrameElement | null;
+		const external = document.getElementById('book-overlay-external') as HTMLAnchorElement | null;
+		const overlay = document.getElementById('book-overlay');
+		if (!frame || !overlay) return;
 
-		// 離開前先替掃描器多推一筆歷史條目。
-		//
-		// WebKit（iOS Safari）會把「載入後沒有使用者操作就自動導走」當成 client
-		// redirect，用 replace 取代當前的歷史條目而不是往後推一筆——掃描器那一筆
-		// 就這樣被書頁吃掉，使用者按上一頁會直接跳到更前面的頁面，回不到掃描器。
-		// 條碼是相機自己解出來的，永遠不算使用者手勢，所以一定會踩到這個啟發式。
-		//
-		// 多推一筆之後兩種語意都安全：被 replace 就吃掉這筆多的、原本那筆還在；
-		// 正常 push 則是多一筆相同網址的掃描器頁。不論哪種，按一次上一頁都會回到
-		// 掃描器。桌機 Chrome 實測一律是 push，加了這行也不會變差。
+		frame.src = url;
+		if (external) external.href = url;
+		overlay.classList.remove('hidden');
+		this.overlayOpen = true;
+
+		// 疊層後面不要繼續解碼，但相機留著——關掉疊層要能立刻接著掃
+		this.scannerService.pauseScanning();
+
+		// 推一筆歷史條目，讓手機的上一頁變成「關閉疊層」而不是離開整個 app
 		try {
-			history.pushState(null, '', location.href);
+			history.pushState({ bookOverlay: true }, '', location.href);
 		} catch {
-			/* pushState 失敗不該擋住導向，最差就是回到修正前的行為 */
+			/* 推不了就只剩 ✕ 可以關，不影響主要流程 */
 		}
+	}
 
-		location.assign(`${BOOK_PAGE_BASE}${code}/`);
+	/** 關閉疊層並恢復掃描。統一走上一頁，讓 ✕ 與實體返回鍵收斂到同一條路徑。 */
+	private requestCloseOverlay(): void {
+		if (!this.overlayOpen) return;
+		history.back();
+	}
+
+	private closeOverlay(): void {
+		if (!this.overlayOpen) return;
+		this.overlayOpen = false;
+
+		const frame = document.getElementById('book-frame') as HTMLIFrameElement | null;
+		document.getElementById('book-overlay')?.classList.add('hidden');
+		// 清掉 src 讓書頁停止運作並釋放記憶體，否則疊層開開關關會越積越多
+		if (frame) frame.src = 'about:blank';
+
+		this.scannerService.resumeScanning();
 	}
 
 	/** 顯示上一本掃到的書，方便確認剛才掃到什麼、或不用再掃一次就重開。 */

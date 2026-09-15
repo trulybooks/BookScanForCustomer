@@ -72,6 +72,16 @@ export class ScannerService {
 	private startGeneration: number = 0;
 
 	/**
+	 * 暫停解碼但保留相機串流。開啟書籍疊層時用：停掉解碼避免疊層後面繼續觸發，
+	 * 但不關相機——關掉再開要等 getUserMedia 重新協商，關閉疊層想馬上掃下一本
+	 * 就會卡住半秒以上。整個相機的關閉留給離開頁面時（visibilitychange）處理。
+	 */
+	private isPaused: boolean = false;
+
+	/** scanFrame 的參照，resumeScanning 用它把迴圈接回去。 */
+	private resumeLoop: (() => void) | null = null;
+
+	/**
 	 * Initialize the scanner
 	 */
 	async startScanner(
@@ -168,6 +178,7 @@ export class ScannerService {
 
 		this.isStarting = false;
 		this.isScanning = true;
+		this.isPaused = false;
 		this.armed = false;
 
 		const canvas = document.createElement('canvas');
@@ -178,7 +189,7 @@ export class ScannerService {
 			// 舊迴圈會繼續跑，兩個迴圈共用 armed：一個看到空白幀把它設為 true，
 			// 另一個下一幀就消耗掉，「要先看到一幀沒有條碼」的保護等於失效。
 			if (generation !== this.startGeneration) return;
-			if (!this.isScanning || !this.videoEl || !ctx) return;
+			if (!this.isScanning || this.isPaused || !this.videoEl || !ctx) return;
 
 			if (this.videoEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && this.videoEl.videoWidth > 0) {
 				const vw = this.videoEl.videoWidth;
@@ -222,7 +233,31 @@ export class ScannerService {
 			this.scanTimer = setTimeout(scanFrame, SCAN_INTERVAL_MS);
 		};
 
+		this.resumeLoop = scanFrame;
 		scanFrame();
+	}
+
+	/** 暫停解碼，保留相機串流。 */
+	pauseScanning(): void {
+		if (!this.isScanning || this.isPaused) return;
+
+		this.isPaused = true;
+		if (this.scanTimer !== null) {
+			clearTimeout(this.scanTimer);
+			this.scanTimer = null;
+		}
+	}
+
+	/**
+	 * 恢復解碼。armed 會歸零，所以要重新看到一幀沒有條碼才會再觸發——關掉疊層時
+	 * 鏡頭通常還對著剛掃完的那本書，不歸零的話會立刻又把同一本開起來。
+	 */
+	resumeScanning(): void {
+		if (!this.isScanning || !this.isPaused) return;
+
+		this.isPaused = false;
+		this.armed = false;
+		this.resumeLoop?.();
 	}
 
 	/**
@@ -248,6 +283,8 @@ export class ScannerService {
 
 	private cleanup(): void {
 		this.isScanning = false;
+		this.isPaused = false;
+		this.resumeLoop = null;
 
 		if (this.scanTimer !== null) {
 			clearTimeout(this.scanTimer);
