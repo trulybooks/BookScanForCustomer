@@ -41,6 +41,21 @@ export class ScannerService {
 	private isScanning: boolean = false;
 
 	/**
+	 * 要先看到「畫面中沒有條碼」的一幀，才會回報下一次掃到的結果。
+	 *
+	 * 這是為了同頁導向的返回流程：從單書頁按上一頁回來時相機會重新啟動，若鏡頭
+	 * 還對著剛才那本書，會立刻又解碼成功、又把整頁導走——使用者看到的是「上一頁
+	 * 按了沒用」。要求中間至少有一幀是空的，等於要求鏡頭真的離開過書本，
+	 * 返回後就會穩穩停在掃描器上。
+	 *
+	 * 刻意不是「記住上一個條碼、相同就略過」：很多書在 ISBN 旁邊還印了第二個
+	 * 條碼（例如 471… 開頭的內部碼），兩個碼會交替被讀到，依條碼比對的做法完全
+	 * 擋不住。而且那種做法會讓同一本書沒辦法再掃一次；這裡不限制內容，
+	 * 鏡頭移開再回來就能重掃同一本。
+	 */
+	private armed: boolean = false;
+
+	/**
 	 * Initialize the scanner
 	 */
 	async startScanner(
@@ -113,6 +128,7 @@ export class ScannerService {
 		}
 
 		this.isScanning = true;
+		this.armed = false;
 
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -134,11 +150,22 @@ export class ScannerService {
 
 				try {
 					const results = await readBarcodes(ctx.getImageData(0, 0, cw, ch), READER_OPTIONS);
+
+					let found: string | null = null;
 					for (const result of results) {
 						if (result.isValid && this.isValidISBN(result.text)) {
-							onSuccess(result.text);
-							return;
+							found = result.text;
+							break;
 						}
+					}
+
+					if (!found) {
+						// 看到乾淨的一幀就重新上膛
+						this.armed = true;
+					} else if (this.armed) {
+						this.armed = false;
+						onSuccess(found);
+						return;
 					}
 				} catch (error) {
 					// Real decode-infrastructure errors only — "no barcode in

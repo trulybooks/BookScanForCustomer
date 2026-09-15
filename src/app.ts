@@ -10,15 +10,12 @@ import { UIUtils } from './utils.js';
 const BOOK_PAGE_BASE = 'https://trulybookstore.in-common.tw/books/book-';
 
 /**
- * 記住最後一次開啟的條碼，掃到同一本時直接略過。
- *
- * 這在同頁導向下是必要的，不是最佳化：從單書頁按上一頁回來時相機會重新啟動，
- * 如果鏡頭還對著同一本書，立刻又會解碼成功、又把整頁導走——使用者會被困在
- * 「一按上一頁就被彈回書頁」的迴圈裡，連換下一本的機會都沒有。
+ * 上一本掃到的條碼，純粹用來在返回後把「上次掃描」那張卡片顯示出來。
+ * 這不是重複掃描的抑制——掃到什麼就開什麼，同一本也可以一直重掃。
  *
  * 存在 sessionStorage 而不是只放記憶體：回上一頁不一定走 bfcache（頁面用過
- * getUserMedia 時常常不符合 bfcache 條件），整頁重新載入的話記憶體裡的值就沒了，
- * 迴圈照樣成立。sessionStorage 只活在這個分頁、關掉就消失，不是在存使用者資料。
+ * getUserMedia 時常常不符合 bfcache 條件），整頁重新載入記憶體裡的值就沒了。
+ * sessionStorage 只活在這個分頁、關掉就消失，不是在存使用者資料。
  */
 const LAST_CODE_KEY = 'bookScan_lastOpenedCode';
 
@@ -28,7 +25,7 @@ class BookScanApp {
 	constructor() {
 		this.setupEventListeners();
 
-		// 回到本頁時把上一本顯示出來，才有辦法再打開它（同一本不會再自動導向）
+		// 回到本頁時把上一本顯示出來，方便確認剛才掃到什麼、或再開一次
 		const previous = this.getLastOpenedCode();
 		if (previous) this.showResult(previous);
 
@@ -48,7 +45,7 @@ class BookScanApp {
 		try {
 			sessionStorage.setItem(LAST_CODE_KEY, code);
 		} catch {
-			/* 存不了就算了，頂多同一本會再導向一次，不影響主要流程 */
+			/* 存不了就算了，只影響「上次掃描」卡片，不影響掃描與導向 */
 		}
 	}
 
@@ -110,13 +107,13 @@ class BookScanApp {
 		}
 	}
 
-	/** 掃到條碼：開啟對應的單書頁。 */
+	/**
+	 * 掃到什麼就開什麼——不比對條碼內容、同一本也可以一直重掃。
+	 * 「返回後不要立刻又被導走」是由 ScannerService 的 armed 機制處理的
+	 * （要先看到一幀沒有條碼），跟條碼是什麼無關。
+	 */
 	private handleScannedCode(code: string): void {
-		const cleaned = code.replace(/[-\s]/g, '');
-
-		if (cleaned === this.getLastOpenedCode()) return;
-
-		this.openBookPage(cleaned);
+		this.openBookPage(code.replace(/[-\s]/g, ''));
 	}
 
 	private handleManualSubmit(): void {
@@ -150,10 +147,7 @@ class BookScanApp {
 		location.assign(`${BOOK_PAGE_BASE}${code}/`);
 	}
 
-	/**
-	 * 顯示上一本掃到的書。回到本頁後同一本不會再自動導向（見 LAST_CODE_KEY），
-	 * 這張卡片就是重新打開它的唯一入口。
-	 */
+	/** 顯示上一本掃到的書，方便確認剛才掃到什麼、或不用再掃一次就重開。 */
 	private showResult(code: string): void {
 		const result = document.getElementById('scan-result');
 		const link = document.getElementById('scan-result-link') as HTMLAnchorElement | null;

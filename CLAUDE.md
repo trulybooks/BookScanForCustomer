@@ -70,27 +70,47 @@ Two things follow from this, and both have bitten:
   this repo's deploys and the website's monthly regeneration cron, for a check the 404 page
   already handles.
 
-## Opening the book page: why it's not just `window.open`
+## Opening the book page: same tab, and the `armed` gate that makes back work
 
-The scan callback fires from an async decode loop, which browsers do **not** treat as a user
-gesture, so `window.open` gets popup-blocked (iOS Safari especially). `openBookPage` therefore
-attempts the open and **falls back to showing a result card with a real link** when it's
-blocked — tapping that link is a genuine gesture and always works. Manual ISBN entry doesn't
-have this problem because the submit click is already a gesture.
+`openBookPage` uses `location.assign` — a **same-tab** navigation. It was `window.open` with a
+new tab, which does not survive contact with a phone: the scan callback fires from an async
+decode loop, which browsers don't treat as a user gesture, so iOS Safari showed a blocked-popup
+warning and the reader had to tap a fallback card to get through. Same-tab navigation is never
+popup-blocked, so the warning cannot occur. Don't reintroduce `window.open` here.
 
-Do not "simplify" this to `window.open(url, '_blank', 'noopener')`: **with `noopener` the
-browser returns `null` even on success**, which destroys the only signal for whether the popup
-was blocked. The code opens without `noopener` and clears `opener` on the returned window.
+The cost is that reading the next book means pressing back, which creates the failure this
+section is really about. On back the scanner reloads and the camera restarts; **if it is still
+pointed at the book, it decodes again instantly and navigates away again** — the reader presses
+back, gets bounced straight to the book page, and concludes the back button is broken.
 
-Related behaviors in `app.ts` that exist for a reason:
+`ScannerService.armed` is the fix: after the scanner starts, it reports nothing until it has
+seen **one frame with no barcode in it**. That means the camera has to actually leave the book
+before the next navigation, so returning always lands you on a stable scanner.
 
-- The last-opened barcode is remembered and re-scans of the *same* code are ignored. Otherwise
-  returning to the tab with the camera still pointed at the same book immediately opens
-  another duplicate tab.
-- The camera stops on `visibilitychange` (opening the book page backgrounds this tab; leaving
-  the camera on drains battery and keeps the recording indicator lit) and restarts on return.
+This was originally solved in `app.ts` by remembering the last barcode and ignoring re-scans of
+the same code. **Don't go back to that** — it fails twice over:
+
+- Many books carry a second barcode next to the ISBN (a `471…` internal/price code is common
+  here). The wide scan region picks up whichever, so the two codes alternate and a
+  remembered-code check never matches. The reader gets bounced anyway.
+- It made a book impossible to rescan on purpose. The `armed` gate doesn't look at the code at
+  all, so scanning the same book again works — just move the camera away and back.
+
+Other behaviors that exist for a reason:
+
+- The camera stops on `visibilitychange` (leaving it on drains battery and keeps the recording
+  indicator lit) and restarts on return.
 - `pageshow` with `persisted` restarts the scanner, because a bfcache-restored `<video>` has a
-  dead stream.
+  dead stream. A page that has used `getUserMedia` often isn't bfcache-eligible, so the plain
+  reload path in the constructor matters just as much.
+- The last code is kept in `sessionStorage` purely to render the "last scanned" card after a
+  return. It is **not** a duplicate-scan guard; see above.
+
+Headless Chrome cannot verify any of this: the camera and wasm pipeline never advance far
+enough under the virtual clock to produce a decode. What is testable, and worth redoing after
+changes here, is replaying Y4M frames through the real decoder in Node and running the `armed`
+state machine over the results — barcode-in-every-frame must never fire, blank-then-barcode
+must fire exactly once.
 
 ## Key design decision: the UI follows the truly-bookstore website
 
