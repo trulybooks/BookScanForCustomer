@@ -75,12 +75,12 @@
 		     這樣就沒有彈出視窗攔截、沒有歷史條目被 client redirect 吃掉的問題，
 		     相機也不用關，關掉疊層可以立刻掃下一本。 -->
 		<div id="book-overlay" class="book-overlay hidden">
-			<div class="book-overlay-bar">
-				<button id="btn-close-book" class="book-overlay-close">✕ 關閉</button>
+			<div class="book-overlay-card">
+				<button id="btn-close-book" class="book-overlay-close" aria-label="關閉">✕</button>
+				<iframe id="book-frame" class="book-overlay-frame" title="單書頁"></iframe>
 				<a id="book-overlay-external" class="book-overlay-external" href="#" target="_blank"
 					rel="noopener">在新分頁開啟 ↗</a>
 			</div>
-			<iframe id="book-frame" class="book-overlay-frame" title="單書頁"></iframe>
 		</div>
 
 		<!-- Footer：比照官網的深色收尾（#3E3530，DESIGN_GUIDE 1.2 / 3.8） -->
