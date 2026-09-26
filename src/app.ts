@@ -83,6 +83,11 @@ class BookScanApp {
 			this.closeOverlay();
 		});
 
+		// modal 最下方的「繼續掃書」，跟右上角的 ✕ 完全同一個動作
+		document.getElementById('btn-continue-scan')?.addEventListener('click', () => {
+			this.closeOverlay();
+		});
+
 		// 點遮罩也能關，跟官網其他 modal 一致（點卡片本身不會關）
 		document.getElementById('book-overlay')?.addEventListener('click', (e) => {
 			if (e.target === e.currentTarget) this.closeOverlay();

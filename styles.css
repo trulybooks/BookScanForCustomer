@@ -441,6 +441,13 @@ main {
 	border-color: var(--primary);
 }
 
+/* 主要出口：放在 modal 最下方，單手也按得到 */
+.book-overlay-continue {
+	flex-shrink: 0;
+	width: 100%;
+	margin-top: 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.book-overlay,
 	.book-overlay-card {
