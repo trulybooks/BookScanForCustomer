@@ -110,12 +110,6 @@ h1, h2, h3 {
 	flex-shrink: 0;
 }
 
-.app-header h1 {
-	font-size: 1.1rem;
-	letter-spacing: 0.08em;
-	white-space: nowrap;
-}
-
 /* Eyebrow 小標：英文全大寫 + tracking-[0.25em] + accent 色（DESIGN_GUIDE 3.2） */
 .eyebrow {
 	display: block;
@@ -196,7 +190,7 @@ main {
 	margin-bottom: 4px;
 }
 
-.scanner-intro h2 {
+.scanner-intro h1 {
 	font-size: 1.4rem;
 }
 
@@ -523,15 +517,11 @@ main {
 		height: 42px;
 	}
 
-	.app-header h1 {
-		font-size: 1.25rem;
-	}
-
 	main {
 		padding: 32px var(--spacing-lg);
 	}
 
-	.scanner-intro h2 {
+	.scanner-intro h1 {
 		font-size: 1.6rem;
 	}
 }
@@ -540,10 +530,6 @@ main {
 @media (max-width: 375px) {
 	main {
 		padding: var(--spacing-md) 14px;
-	}
-
-	.app-header h1 {
-		font-size: 1rem;
 	}
 
 	.btn {
